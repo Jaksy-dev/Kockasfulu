@@ -19,6 +19,26 @@ std::vector<std::string> split_by_space(const std::string& input) {
     return tokens;
 }
 
+bool isOver(const Board& board, const Movelist& moves){
+    if (board.isHalfMoveDraw()){
+        // return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? 
+        //     MATED_SCORE : DRAW_SCORE;
+        return true;
+    }
+
+    if (board.isRepetition()){
+        //return DRAW_SCORE;
+        return true;
+    }
+
+    // no moves means game over
+    if (moves.empty()){
+        //return board.inCheck() ? MATED_SCORE : DRAW_SCORE;
+        return true;
+    }
+    return false;
+}
+
 void parseCommand(const std::string & input){
     auto commands = split_by_space(input);
     auto main_command = commands.front();
@@ -52,6 +72,9 @@ void parseCommand(const std::string & input){
     if (main_command == "go"){
         Movelist moves;
         movegen::legalmoves(moves, current_board);
+        if (isOver(current_board, moves)){
+            return;
+        }
         // pick the first legal move
         std::cout << "bestmove " << uci::moveToUci(moves.front()) << "\n";
     }
@@ -65,21 +88,7 @@ void parseCommand(const std::string & input){
 
 
 
-// void isOver(const Board& board){
-//     if (board.isHalfMoveDraw()){
-//         return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? 
-//             MATED_SCORE : DRAW_SCORE;
-//     }
 
-//     if (board.isRepetition()){
-//         return DRAW_SCORE;
-//     }
-
-//     // no moves means game over
-//     if (moves.empty()){
-//         return board.inCheck() ? MATED_SCORE : DRAW_SCORE;
-//     }
-// }
 
 int main() {
     std::cout << "kockasfulu\n";
