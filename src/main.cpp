@@ -16,6 +16,12 @@ constexpr auto WHITE_BISHOP_VALUE = 3;
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+struct BestMove
+{
+    Move move;
+    int eval;
+};
+
 static Board current_board = Board(STARTER_FEN);
 
 std::vector<std::string> split_by_space(const std::string &input)
@@ -30,28 +36,9 @@ std::vector<std::string> split_by_space(const std::string &input)
     return tokens;
 }
 
-int evaluate(const Board &board, const Movelist &moves)
-{
-    // Returns 0 for a draw, INT_MAX for white win, INT_MIN for black win.
+int evaluate(const Board & board) // constref instead?
+{                         // Returns 0 for a draw, INT_MAX for white win, INT_MIN for black win.
     // Otherwise returns the piece material difference in centipawns.
-
-    auto side_to_move = board.sideToMove();
-
-    if (board.isHalfMoveDraw())
-    {
-        // I'm really not sure who is supposed to be the winner in the case of checkmate. TODO investigate.
-        return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN) : DRAW_SCORE;
-    }
-
-    if (board.isRepetition())
-    {
-        return DRAW_SCORE;
-    }
-    // no moves means game over
-    if (moves.empty())
-    {
-        return board.inCheck() ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN) : DRAW_SCORE;
-    }
 
     int score = 0;
     score += board.pieces(PieceType::PAWN, Color::WHITE).count();
@@ -69,14 +56,121 @@ int evaluate(const Board &board, const Movelist &moves)
     return score * 100;
 }
 
+BestMove minimax(Board board, int depth, Color current_player)
+{
+
+    Movelist moves;
+    movegen::legalmoves(moves, board);
+
+    auto side_to_move = board.sideToMove();
+
+    if (board.isHalfMoveDraw())
+    {
+        // 50 move rule
+        // I'm really not sure who is supposed to be the winner in the case of this ::checkmate. TODO investigate.
+        return {.move = Move::NO_MOVE,
+                .eval = board.getHalfMoveDrawType()
+                                    .first == GameResultReason::CHECKMATE
+                            ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN)
+                            : DRAW_SCORE} /*50 move rule*/;
+    }
+
+    if (board.isRepetition())
+    {
+        /*threefold*/
+        return {
+            .move = Move::NO_MOVE,
+            .eval = DRAW_SCORE};
+    }
+    // no moves means game over
+    if (moves.empty())
+    {
+        return {.move = Move::NO_MOVE, .eval = board.inCheck() ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN) /*checkmate*/ : DRAW_SCORE /*stalemate*/};
+    }
+
+    if (depth == 0)
+    {
+        if (current_player == Color::WHITE)
+        {
+            BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
+
+            for (auto &&move : moves)
+            {
+                Board newboard = board;
+                newboard.makeMove(move);
+                int eval = evaluate(newboard);
+                if (eval > bestmove.eval)
+                {
+                    bestmove.move = move;
+                    bestmove.eval = eval;
+                }
+            }
+            return bestmove;
+        }
+        else
+        {
+            BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
+
+            for (auto &&move : moves)
+            {
+                Board newboard = board;
+                newboard.makeMove(move);
+                int eval = evaluate(newboard);
+                if (eval < bestmove.eval)
+                {
+                    bestmove.move = move;
+                    bestmove.eval = eval;
+                }
+            }
+            return bestmove;
+        }
+    }
+
+
+
+    if (current_player == Color::WHITE)
+    {
+        BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
+
+        for (auto &&move : moves)
+        {
+            Board newboard = board;
+            newboard.makeMove(move);
+            BestMove kurwa = minimax(newboard, depth - 1, Color::BLACK);
+            if (kurwa.eval > bestmove.eval)
+            {
+                bestmove.move = move;
+                bestmove.eval = kurwa.eval;
+            }
+        }
+        return bestmove;
+    }
+    else
+    {
+        BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
+
+        for (auto &&move : moves)
+        {
+            Board newboard = board;
+            newboard.makeMove(move);
+            BestMove kurwa = minimax(newboard, depth - 1, Color::WHITE);
+            if (kurwa.eval < bestmove.eval)
+            {
+                bestmove.move = move;
+                bestmove.eval = kurwa.eval;
+            }
+        }
+        return bestmove;
+    }
+}
+
 void bestMove()
 {
-    Movelist moves;
-    movegen::legalmoves(moves, current_board);
 
     // pick the first legal move
-    std::cout << "info score cp " << evaluate(current_board, moves) << "\n";
-    std::cout << "bestmove " << uci::moveToUci(moves.front()) << "\n";
+    auto bestmove = minimax(current_board, 2, current_board.sideToMove());
+    std::cout << "info score cp " << bestmove.eval << "\n";
+    std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
 
 void parseCommand(const std::string &input)
@@ -102,8 +196,9 @@ void parseCommand(const std::string &input)
         if (commands[1] == "fen")
         {
             // fenstring is 6 segments long
-            current_board = Board(commands[2] + commands[3] + commands[4] + commands[5] + commands[6]);
+            current_board = Board(commands[2] + " " + commands[3] + " " + commands[4] + " " + commands[5] + " " + commands[6]);
             if (commands.size() > 7)
+            // moves are inputted after fenstring
             {
                 for (auto it = commands.begin() + 9; it != commands.end(); ++it)
                 {
@@ -115,6 +210,7 @@ void parseCommand(const std::string &input)
         {
             current_board = Board(STARTER_FEN);
             if (commands.size() > 2)
+            // moves are inputted after "startpos"
             {
                 for (auto it = commands.begin() + 3; it != commands.end(); ++it)
                 {
