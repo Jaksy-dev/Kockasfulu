@@ -23,6 +23,7 @@ struct BestMove
 };
 
 static Board current_board = Board(STARTER_FEN);
+static std::string current_pgn{};
 
 std::vector<std::string> split_by_space(const std::string &input)
 {
@@ -36,8 +37,8 @@ std::vector<std::string> split_by_space(const std::string &input)
     return tokens;
 }
 
-int evaluate(const Board & board) // constref instead?
-{                         // Returns 0 for a draw, INT_MAX for white win, INT_MIN for black win.
+int evaluate(const Board &board) // constref instead?
+{                                // Returns 0 for a draw, INT_MAX for white win, INT_MIN for black win.
     // Otherwise returns the piece material difference in centipawns.
 
     int score = 0;
@@ -126,8 +127,6 @@ BestMove minimax(Board board, int depth, Color current_player)
         }
     }
 
-
-
     if (current_player == Color::WHITE)
     {
         BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
@@ -166,9 +165,7 @@ BestMove minimax(Board board, int depth, Color current_player)
 
 void bestMove()
 {
-
-    // pick the first legal move
-    auto bestmove = minimax(current_board, 2, current_board.sideToMove());
+    auto bestmove = minimax(current_board, 3, current_board.sideToMove());
     std::cout << "info score cp " << bestmove.eval << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
@@ -202,19 +199,25 @@ void parseCommand(const std::string &input)
             {
                 for (auto it = commands.begin() + 9; it != commands.end(); ++it)
                 {
-                    current_board.makeMove(uci::uciToMove(current_board, *it));
+                    auto move = uci::uciToMove(current_board, *it);
+                    current_pgn.append(uci::moveToSan(current_board, move));
+                    current_pgn.append(" ");
+                    current_board.makeMove(move);
                 }
             }
         }
         else if (commands[1] == "startpos")
         {
             current_board = Board(STARTER_FEN);
+            current_pgn = "";
             if (commands.size() > 2)
             // moves are inputted after "startpos"
             {
                 for (auto it = commands.begin() + 3; it != commands.end(); ++it)
                 {
-                    current_board.makeMove(uci::uciToMove(current_board, *it));
+                    auto move = uci::uciToMove(current_board, *it);
+                    current_pgn.append(uci::moveToSan(current_board, move)).append(" ");
+                    current_board.makeMove(move);
                 }
             }
         }
@@ -237,6 +240,7 @@ void parseCommand(const std::string &input)
     }
     if (main_command == "quit")
     {
+        std::cout << current_pgn << "\n";
         exit(0);
     }
 }
