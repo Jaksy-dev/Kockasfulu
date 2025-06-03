@@ -1,8 +1,13 @@
 #include <iostream>
 #include <string>
 #include <iosfwd>
-#include "chess.hpp"
 #include <limits.h>
+#include <random>
+#include <algorithm> // for std::shuffle
+#include <random>    // for std::default_random_engine
+#include <chrono>    // for std::chrono::system_clock
+
+#include "chess.hpp"
 
 using namespace chess;
 
@@ -24,6 +29,7 @@ struct BestMove
 
 static Board current_board = Board(STARTER_FEN);
 static std::string current_pgn{};
+static std::default_random_engine rng(std::random_device{}());
 
 std::vector<std::string> split_by_space(const std::string &input)
 {
@@ -62,6 +68,8 @@ BestMove minimax(Board board, int depth, Color current_player)
 
     Movelist moves;
     movegen::legalmoves(moves, board);
+
+    std::shuffle(moves.begin(), moves.end(), rng);
 
     auto side_to_move = board.sideToMove();
 
