@@ -3,9 +3,9 @@
 #include <iosfwd>
 #include <limits.h>
 #include <random>
-#include <algorithm> // for std::shuffle
-#include <random>    // for std::default_random_engine
-#include <chrono>    // for std::chrono::system_clock
+#include <algorithm>
+#include <random>
+#include <chrono>
 
 #include "chess.hpp"
 
@@ -43,9 +43,9 @@ std::vector<std::string> split_by_space(const std::string &input)
     return tokens;
 }
 
-int evaluate(const Board &board) // constref instead?
-{                                // Returns 0 for a draw, INT_MAX for white win, INT_MIN for black win.
-    // Otherwise returns the piece material difference in centipawns.
+int evaluate(const Board &board) 
+{
+    // Returns the piece material difference in centipawns.
 
     int score = 0;
     score += board.pieces(PieceType::PAWN, Color::WHITE).count();
@@ -65,7 +65,6 @@ int evaluate(const Board &board) // constref instead?
 
 BestMove minimax(Board board, int depth, Color current_player)
 {
-
     Movelist moves;
     movegen::legalmoves(moves, board);
 
@@ -143,11 +142,11 @@ BestMove minimax(Board board, int depth, Color current_player)
         {
             Board newboard = board;
             newboard.makeMove(move);
-            BestMove kurwa = minimax(newboard, depth - 1, Color::BLACK);
-            if (kurwa.eval > bestmove.eval)
+            BestMove candidatemove = minimax(newboard, depth - 1, Color::BLACK);
+            if (candidatemove.eval > bestmove.eval)
             {
                 bestmove.move = move;
-                bestmove.eval = kurwa.eval;
+                bestmove.eval = candidatemove.eval;
             }
         }
         return bestmove;
@@ -160,11 +159,11 @@ BestMove minimax(Board board, int depth, Color current_player)
         {
             Board newboard = board;
             newboard.makeMove(move);
-            BestMove kurwa = minimax(newboard, depth - 1, Color::WHITE);
-            if (kurwa.eval < bestmove.eval)
+            BestMove candidatemove = minimax(newboard, depth - 1, Color::WHITE);
+            if (candidatemove.eval < bestmove.eval)
             {
                 bestmove.move = move;
-                bestmove.eval = kurwa.eval;
+                bestmove.eval = candidatemove.eval;
             }
         }
         return bestmove;
