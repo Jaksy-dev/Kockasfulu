@@ -4,7 +4,6 @@
 #include <limits.h>
 #include <random>
 #include <algorithm>
-#include <random>
 #include <chrono>
 
 #include "chess.hpp"
@@ -25,7 +24,6 @@ struct BestMove
 
 static Board current_board = Board(STARTER_FEN);
 static std::string current_pgn{};
-static std::default_random_engine rng(std::random_device{}());
 
 std::vector<std::string> split_by_space(const std::string &input)
 {
@@ -42,18 +40,16 @@ std::vector<std::string> split_by_space(const std::string &input)
 int evaluate(const Board &board)
 {
     // Returns the piece material difference in centipawns.
-    // Takes around 320-350ns to run this function.
     // auto starttime = std::chrono::high_resolution_clock::now();
+
     int score = 0;
     score += board.pieces(PieceType::PAWN, Color::WHITE).count();
-    score += 3 * board.pieces(PieceType::BISHOP, Color::WHITE).count();
-    score += 3 * board.pieces(PieceType::KNIGHT, Color::WHITE).count();
+    score += 3 * (board.pieces(PieceType::BISHOP, Color::WHITE) | board.pieces(PieceType::KNIGHT, Color::WHITE)).count();
     score += 5 * board.pieces(PieceType::ROOK, Color::WHITE).count();
     score += 9 * board.pieces(PieceType::QUEEN, Color::WHITE).count();
 
     score -= board.pieces(PieceType::PAWN, Color::BLACK).count();
-    score -= 3 * board.pieces(PieceType::BISHOP, Color::BLACK).count();
-    score -= 3 * board.pieces(PieceType::KNIGHT, Color::BLACK).count();
+    score -= 3 * (board.pieces(PieceType::BISHOP, Color::BLACK) | board.pieces(PieceType::KNIGHT, Color::BLACK)).count();
     score -= 5 * board.pieces(PieceType::ROOK, Color::BLACK).count();
     score -= 9 * board.pieces(PieceType::QUEEN, Color::BLACK).count();
 
@@ -63,12 +59,12 @@ int evaluate(const Board &board)
     return score * 100;
 }
 
-BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_player)
+BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_player)
 {
     Movelist moves;
     movegen::legalmoves(moves, board);
 
-    std::shuffle(moves.begin(), moves.end(), rng);
+    std::random_shuffle(moves.begin(), moves.end()); // Exactly std::distance(first, last) - 1 swaps.
 
     auto side_to_move = board.sideToMove();
 
@@ -96,22 +92,24 @@ BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_pl
         return {.move = Move::NO_MOVE, .eval = board.inCheck() ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN) /*checkmate*/ : DRAW_SCORE /*stalemate*/};
     }
 
+    // base case
     if (depth == 0)
     {
         if (current_player == Color::WHITE)
         {
             BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
 
-            for (auto &&move : moves)
+            for (const auto &move : moves)
             {
-                Board newboard = board;
-                newboard.makeMove(move);
-                int eval = evaluate(newboard);
+
+                board.makeMove(move);
+                int eval = evaluate(board);
                 if (eval > bestmove.eval)
                 {
                     bestmove.move = move;
                     bestmove.eval = eval;
                 }
+                board.unmakeMove(move);
             }
             return bestmove;
         }
@@ -121,33 +119,36 @@ BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_pl
 
             for (auto &&move : moves)
             {
-                Board newboard = board;
-                newboard.makeMove(move);
-                int eval = evaluate(newboard);
+
+                board.makeMove(move);
+                int eval = evaluate(board);
                 if (eval < bestmove.eval)
                 {
                     bestmove.move = move;
                     bestmove.eval = eval;
                 }
+                board.unmakeMove(move);
             }
             return bestmove;
         }
     }
 
+    // recursive
     if (current_player == Color::WHITE)
     {
         BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
 
         for (auto &&move : moves)
         {
-            Board newboard = board;
-            newboard.makeMove(move);
-            BestMove candidatemove = alphabeta(newboard, depth - 1, alpha, beta, Color::BLACK);
+
+            board.makeMove(move);
+            BestMove candidatemove = alphabeta(board, depth - 1, alpha, beta, Color::BLACK);
             if (candidatemove.eval > bestmove.eval)
             {
                 bestmove.move = move;
                 bestmove.eval = candidatemove.eval;
             }
+            board.unmakeMove(move);
             if (candidatemove.eval >= beta)
             {
                 break;
@@ -160,16 +161,16 @@ BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_pl
     {
         BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
 
-        for (auto &&move : moves)
+        for (const auto &move : moves)
         {
-            Board newboard = board;
-            newboard.makeMove(move);
-            BestMove candidatemove = alphabeta(newboard, depth - 1, alpha, beta, Color::WHITE);
+            board.makeMove(move);
+            BestMove candidatemove = alphabeta(board, depth - 1, alpha, beta, Color::WHITE);
             if (candidatemove.eval < bestmove.eval)
             {
                 bestmove.move = move;
                 bestmove.eval = candidatemove.eval;
             }
+            board.unmakeMove(move);
             if (candidatemove.eval <= alpha)
             {
                 break;
@@ -182,7 +183,7 @@ BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_pl
 
 void bestMove()
 {
-    auto bestmove = alphabeta(current_board, 4, INT_MIN, INT_MAX, current_board.sideToMove());
+    auto bestmove = alphabeta(current_board, 6, INT_MIN, INT_MAX, current_board.sideToMove());
     std::cout << "info score cp " << bestmove.eval << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }

@@ -21,3 +21,11 @@ target_include_directories(${PROJECT_NAME}
         ${PROJECT_SOURCE_DIR}/external
         ${PROJECT_SOURCE_DIR}/include
 )
+
+# Warning flags and optimization
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -Wall -Wextra -Werror           # Warnings
+        -Ofast -march=native -flto -DNDEBUG           # Optimization
+    )
+endif()
