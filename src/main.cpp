@@ -63,7 +63,7 @@ int evaluate(const Board &board)
     return score * 100;
 }
 
-BestMove minimax(Board board, int depth, Color current_player)
+BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_player)
 {
     Movelist moves;
     movegen::legalmoves(moves, board);
@@ -142,12 +142,16 @@ BestMove minimax(Board board, int depth, Color current_player)
         {
             Board newboard = board;
             newboard.makeMove(move);
-            BestMove candidatemove = minimax(newboard, depth - 1, Color::BLACK);
+            BestMove candidatemove = alphabeta(newboard, depth - 1, alpha, beta, Color::BLACK);
             if (candidatemove.eval > bestmove.eval)
             {
                 bestmove.move = move;
                 bestmove.eval = candidatemove.eval;
             }
+            if (candidatemove.eval >= beta){
+                break;
+            }
+            alpha = std::max(alpha, candidatemove.eval);
         }
         return bestmove;
     }
@@ -159,12 +163,17 @@ BestMove minimax(Board board, int depth, Color current_player)
         {
             Board newboard = board;
             newboard.makeMove(move);
-            BestMove candidatemove = minimax(newboard, depth - 1, Color::WHITE);
+            BestMove candidatemove = alphabeta(newboard, depth - 1, alpha, beta, Color::WHITE);
             if (candidatemove.eval < bestmove.eval)
             {
                 bestmove.move = move;
                 bestmove.eval = candidatemove.eval;
             }
+            if (candidatemove.eval <= alpha)
+            {
+                break;
+            }
+            beta = std::min(beta, candidatemove.eval);
         }
         return bestmove;
     }
@@ -172,7 +181,7 @@ BestMove minimax(Board board, int depth, Color current_player)
 
 void bestMove()
 {
-    auto bestmove = minimax(current_board, 3, current_board.sideToMove());
+    auto bestmove = alphabeta(current_board, 4, INT_MIN, INT_MAX, current_board.sideToMove());
     std::cout << "info score cp " << bestmove.eval << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
