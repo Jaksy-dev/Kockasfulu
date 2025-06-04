@@ -5,6 +5,8 @@
 #include <random>
 #include <algorithm>
 #include <chrono>
+#include <unordered_map>
+#include <memory>
 
 #include "chess.hpp"
 
@@ -24,6 +26,8 @@ struct BestMove
 
 static Board current_board = Board(STARTER_FEN);
 static std::string current_pgn{};
+
+static std::unordered_map<uint64_t, BestMove> transposition_table;
 
 std::vector<std::string> split_by_space(const std::string &input)
 {
@@ -52,9 +56,6 @@ int evaluate(const Board &board)
     score -= 3 * (board.pieces(PieceType::BISHOP, Color::BLACK) | board.pieces(PieceType::KNIGHT, Color::BLACK)).count();
     score -= 5 * board.pieces(PieceType::ROOK, Color::BLACK).count();
     score -= 9 * board.pieces(PieceType::QUEEN, Color::BLACK).count();
-
-    // std::cout << "Evaluating the board took " << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - starttime).count()
-    //           << "ns\n";
 
     return score * 100;
 }
@@ -97,47 +98,75 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
     {
         if (current_player == Color::WHITE)
         {
-            BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
 
+            const auto hash = board.hash();
+            const auto it = transposition_table.find(hash);
+            if (it != transposition_table.end())
+            {
+                return it->second;
+            }
+
+            BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
             for (const auto &move : moves)
             {
-
                 board.makeMove(move);
+
                 int eval = evaluate(board);
+
                 if (eval > bestmove.eval)
                 {
                     bestmove.move = move;
                     bestmove.eval = eval;
                 }
+
                 board.unmakeMove(move);
             }
+
+            transposition_table.emplace(hash, bestmove);
             return bestmove;
         }
         else
         {
-            BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
-
-            for (auto &&move : moves)
+            const auto hash = board.hash();
+            const auto it = transposition_table.find(hash);
+            if (it != transposition_table.end())
             {
+                return it->second;
+            }
 
+            BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
+            for (const auto &move : moves)
+            {
                 board.makeMove(move);
+
                 int eval = evaluate(board);
+
                 if (eval < bestmove.eval)
                 {
                     bestmove.move = move;
                     bestmove.eval = eval;
                 }
+
                 board.unmakeMove(move);
             }
+
+            transposition_table.emplace(hash, bestmove);
             return bestmove;
         }
     }
 
-    // recursive
+    // recursive call
     if (current_player == Color::WHITE)
     {
-        BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
 
+        const auto hash = board.hash();
+        const auto it = transposition_table.find(hash);
+        if (it != transposition_table.end())
+        {
+            return it->second;
+        }
+
+        BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
         for (auto &&move : moves)
         {
 
@@ -155,12 +184,19 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
             }
             alpha = std::max(alpha, candidatemove.eval);
         }
+        transposition_table.emplace(hash, bestmove);
         return bestmove;
     }
     else
     {
-        BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
+        const auto hash = board.hash();
+        const auto it = transposition_table.find(hash);
+        if (it != transposition_table.end())
+        {
+            return it->second;
+        }
 
+        BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
         for (const auto &move : moves)
         {
             board.makeMove(move);
@@ -177,14 +213,17 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
             }
             beta = std::min(beta, candidatemove.eval);
         }
+        transposition_table.emplace(hash, bestmove);
         return bestmove;
     }
 }
 
 void bestMove()
 {
-    auto bestmove = alphabeta(current_board, 6, INT_MIN, INT_MAX, current_board.sideToMove());
-    std::cout << "info score cp " << bestmove.eval << "\n";
+    const auto starttime = std::chrono::high_resolution_clock::now();
+    const auto bestmove = alphabeta(current_board, 8, INT_MIN, INT_MAX, current_board.sideToMove());
+    // @TODO: time should also include "pv"
+    std::cout << "info score cp " << bestmove.eval << " time " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime).count() << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
 
