@@ -25,7 +25,6 @@ struct BestMove
 };
 
 static Board current_board = Board(STARTER_FEN);
-static std::string current_pgn{};
 
 static std::unordered_map<uint64_t, BestMove> transposition_table;
 
@@ -244,8 +243,6 @@ void parseCommand(const std::string &input)
                 for (auto it = commands.begin() + 9; it != commands.end(); ++it)
                 {
                     auto move = uci::uciToMove(current_board, *it);
-                    current_pgn.append(uci::moveToSan(current_board, move));
-                    current_pgn.append(" ");
                     current_board.makeMove(move);
                 }
             }
@@ -253,14 +250,12 @@ void parseCommand(const std::string &input)
         else if (commands[1] == "startpos")
         {
             current_board = Board(STARTER_FEN);
-            current_pgn = "";
             if (commands.size() > 2)
             // moves are inputted after "startpos"
             {
                 for (auto it = commands.begin() + 3; it != commands.end(); ++it)
                 {
                     auto move = uci::uciToMove(current_board, *it);
-                    current_pgn.append(uci::moveToSan(current_board, move)).append(" ");
                     current_board.makeMove(move);
                 }
             }
@@ -284,7 +279,6 @@ void parseCommand(const std::string &input)
     }
     if (main_command == "quit")
     {
-        std::cout << current_pgn << "\n";
         exit(0);
     }
 }
