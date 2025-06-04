@@ -15,10 +15,6 @@ constexpr auto DRAW_SCORE = 0;
 constexpr auto WHITE_WIN = INT_MAX;
 constexpr auto BLACK_WIN = INT_MIN;
 
-constexpr auto WHITE_PAWN_VALUE = 1;
-constexpr auto WHITE_KNIGHT_VALUE = 3;
-constexpr auto WHITE_BISHOP_VALUE = 3;
-
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 struct BestMove
@@ -43,10 +39,11 @@ std::vector<std::string> split_by_space(const std::string &input)
     return tokens;
 }
 
-int evaluate(const Board &board) 
+int evaluate(const Board &board)
 {
     // Returns the piece material difference in centipawns.
-
+    // Takes around 320-350ns to run this function.
+    // auto starttime = std::chrono::high_resolution_clock::now();
     int score = 0;
     score += board.pieces(PieceType::PAWN, Color::WHITE).count();
     score += 3 * board.pieces(PieceType::BISHOP, Color::WHITE).count();
@@ -59,6 +56,9 @@ int evaluate(const Board &board)
     score -= 3 * board.pieces(PieceType::KNIGHT, Color::BLACK).count();
     score -= 5 * board.pieces(PieceType::ROOK, Color::BLACK).count();
     score -= 9 * board.pieces(PieceType::QUEEN, Color::BLACK).count();
+
+    // std::cout << "Evaluating the board took " << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - starttime).count()
+    //           << "ns\n";
 
     return score * 100;
 }
@@ -148,7 +148,8 @@ BestMove alphabeta(Board board, int depth, int alpha, int beta, Color current_pl
                 bestmove.move = move;
                 bestmove.eval = candidatemove.eval;
             }
-            if (candidatemove.eval >= beta){
+            if (candidatemove.eval >= beta)
+            {
                 break;
             }
             alpha = std::max(alpha, candidatemove.eval);

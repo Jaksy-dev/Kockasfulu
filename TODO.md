@@ -11,3 +11,4 @@
 [ ] opening book
 [ ] test the time it takes to execute each function
 [ ] parallelism
+[ ] add compile options
