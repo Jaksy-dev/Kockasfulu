@@ -99,12 +99,7 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
         if (current_player == Color::WHITE)
         {
 
-            const auto hash = board.hash();
-            const auto it = transposition_table.find(hash);
-            if (it != transposition_table.end())
-            {
-                return it->second;
-            }
+
 
             BestMove bestmove{.move = moves.front(), .eval = INT_MIN};
             for (const auto &move : moves)
@@ -122,17 +117,10 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
                 board.unmakeMove(move);
             }
 
-            transposition_table.emplace(hash, bestmove);
             return bestmove;
         }
         else
         {
-            const auto hash = board.hash();
-            const auto it = transposition_table.find(hash);
-            if (it != transposition_table.end())
-            {
-                return it->second;
-            }
 
             BestMove bestmove{.move = moves.front(), .eval = INT_MAX};
             for (const auto &move : moves)
@@ -150,7 +138,6 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
                 board.unmakeMove(move);
             }
 
-            transposition_table.emplace(hash, bestmove);
             return bestmove;
         }
     }
@@ -221,7 +208,7 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
 void bestMove()
 {
     const auto starttime = std::chrono::high_resolution_clock::now();
-    const auto bestmove = alphabeta(current_board, 8, INT_MIN, INT_MAX, current_board.sideToMove());
+    const auto bestmove = alphabeta(current_board, 7, INT_MIN, INT_MAX, current_board.sideToMove());
     // @TODO: time should also include "pv"
     std::cout << "info score cp " << bestmove.eval << " time " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime).count() << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
