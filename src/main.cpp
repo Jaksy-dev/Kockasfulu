@@ -14,7 +14,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 7; // half-moves
+constexpr auto DEPTH = 6; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -36,7 +36,6 @@ struct TTEntry
     BestMove bestmove;
     int depth;
     EntryFlag flag;
-    // is_valid???
 };
 
 static Board current_board = Board(STARTER_FEN);
@@ -59,115 +58,107 @@ std::vector<std::string> split_by_space(const std::string &input)
 
 int evaluate(const Board &board)
 {
-    int score = 0;
-    score += board.pieces(PieceType::PAWN, Color::WHITE).count();
-    score += 3 * (board.pieces(PieceType::BISHOP, Color::WHITE) | board.pieces(PieceType::KNIGHT, Color::WHITE)).count();
-    score += 5 * board.pieces(PieceType::ROOK, Color::WHITE).count();
-    score += 9 * board.pieces(PieceType::QUEEN, Color::WHITE).count();
-
-    score -= board.pieces(PieceType::PAWN, Color::BLACK).count();
-    score -= 3 * (board.pieces(PieceType::BISHOP, Color::BLACK) | board.pieces(PieceType::KNIGHT, Color::BLACK)).count();
-    score -= 5 * board.pieces(PieceType::ROOK, Color::BLACK).count();
-    score -= 9 * board.pieces(PieceType::QUEEN, Color::BLACK).count();
-
-    return score * 100 ;
-}
-
-BestMove negamax(Board &board, int depth, int alpha, int beta)
-{
-    const int alphaOrig = alpha;
-    //const int color = board.sideToMove() == Color::WHITE ? 1 : -1;
-
-    // Transposition table lookup
-    const auto hash = board.hash();
-    auto tt_it = transposition_table->find(hash);
-    if (tt_it != transposition_table->end() && tt_it->second.depth >= depth)
-    {
-        const auto &entry = tt_it->second;
-        if (entry.flag == EntryFlag::EXACT)
-        {
-            return entry.bestmove;
-        }
-        else if (entry.flag == EntryFlag::LOWER_BOUND && entry.bestmove.eval >= beta)
-        {
-            return entry.bestmove;
-        }
-        else if (entry.flag == EntryFlag::UPPER_BOUND && entry.bestmove.eval <= alpha)
-        {
-            return entry.bestmove;
-        }
+    if (board.isHalfMoveDraw()){
+        return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? -INF : DRAW_SCORE;
     }
 
-    // Terminal conditions
-    if (board.isHalfMoveDraw() || board.isRepetition())
-    {
-        return {.move = Move::NO_MOVE, .eval = DRAW_SCORE};
+    if (board.isRepetition()){
+        return DRAW_SCORE;
     }
 
     Movelist moves;
     movegen::legalmoves(moves, board);
 
-    if (moves.empty())
-    {
-        return {.move = Move::NO_MOVE, .eval = board.inCheck() ? -INF : DRAW_SCORE};
+    // no moves means game over
+    if (moves.empty()){
+        return board.inCheck() ? -INF : DRAW_SCORE;
     }
 
-    // Base case - return evaluation
+    int score = 0;
+
+    score += board.pieces(PieceType::PAWN, Color::WHITE).count() * 100;
+    score += board.pieces(PieceType::KNIGHT, Color::WHITE).count() * 300;
+    score += board.pieces(PieceType::BISHOP, Color::WHITE).count() * 300;
+    score += board.pieces(PieceType::ROOK, Color::WHITE).count() * 500;
+    score += board.pieces(PieceType::QUEEN, Color::WHITE).count() * 900;
+
+    score -= board.pieces(PieceType::PAWN, Color::BLACK).count() * 100;
+    score -= board.pieces(PieceType::KNIGHT, Color::BLACK).count() * 300;
+    score -= board.pieces(PieceType::BISHOP, Color::BLACK).count() * 300;
+    score -= board.pieces(PieceType::ROOK, Color::BLACK).count() * 500;
+    score -= board.pieces(PieceType::QUEEN, Color::BLACK).count() * 900;
+
+    return score;
+}
+
+int negamax(Board &board, int depth, int alpha, int beta)
+{
     if (depth == 0)
     {
-        return {.move = Move::NO_MOVE, .eval = evaluate(board)};
+        return board.sideToMove() == Color::WHITE ? evaluate(board) : -evaluate(board);
     }
 
-    std::shuffle(moves.begin(), moves.end(), rng);
-
-    int value = INT_MIN;
-    Move bestMove = moves.front();
+    int max = -INF;
+    Movelist moves;
+    movegen::legalmoves(moves, board);
 
     for (const auto &move : moves)
     {
         board.makeMove(move);
-        BestMove childResult = negamax(board, depth - 1, -beta, -alpha);
-        int childValue = -childResult.eval; // Negate the child's evaluation
+        int score = -negamax(board, depth - 1, -beta, -alpha);
         board.unmakeMove(move);
 
-        if (childValue > value)
+        if (score > max)
         {
-            value = childValue;
-            bestMove = move;
+            max = score;
         }
-
-        alpha = std::max(alpha, value);
+        if (score > alpha)
+        {
+            alpha = score;
+        }
         if (alpha >= beta)
         {
             break; // Beta cutoff
         }
     }
+    return max;
+}
 
-    // Store in transposition table
-    TTEntry entry;
-    entry.bestmove = {.move = bestMove, .eval = value};
-    entry.depth = depth;
-    if (value <= alphaOrig)
-    {
-        entry.flag = EntryFlag::UPPER_BOUND;
-    }
-    else if (value >= beta)
-    {
-        entry.flag = EntryFlag::LOWER_BOUND;
-    }
-    else
-    {
-        entry.flag = EntryFlag::EXACT;
-    }
-    (*transposition_table)[hash] = entry;
+BestMove findBestMove(Board &board, int depth)
+{
+    Movelist moves;
+    movegen::legalmoves(moves, board);
+    Move bestMove = moves.front();
 
-    return {.move = bestMove, .eval = value};
+    std::shuffle(moves.begin(), moves.end(), rng);
+
+    int bestValue = -INF;
+    int alpha = -INF+1;
+    int beta = INF;
+
+    for (const auto &move : moves)
+    {
+        board.makeMove(move);
+        int moveValue = -negamax(board, depth - 1, -beta, -alpha);
+        board.unmakeMove(move);
+        if (moveValue > bestValue)
+        {
+            bestValue = moveValue;
+            bestMove = move;
+        }
+        if (moveValue > alpha)
+        {
+            alpha = moveValue;
+        }
+    }
+
+    return {.move = bestMove, .eval = bestValue};
 }
 
 void bestMove()
 {
     const auto starttime = std::chrono::high_resolution_clock::now();
-    const auto bestmove = negamax(current_board, DEPTH, INT_MIN, INT_MAX);
+    const auto bestmove = findBestMove(current_board, DEPTH);
     std::cout << "info score cp " << bestmove.eval << " time " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime).count() << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
