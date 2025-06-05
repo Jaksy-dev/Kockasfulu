@@ -13,8 +13,7 @@
 using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
-constexpr auto WHITE_WIN = INT_MAX;
-constexpr auto BLACK_WIN = INT_MIN;
+constexpr auto INF = INT_MAX;
 constexpr auto DEPTH = 8; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -25,10 +24,19 @@ struct BestMove
     int eval;
 };
 
+enum class EntryFlag
+{
+    EXACT,
+    LOWER_BOUND,
+    UPPER_BOUND
+};
+
 struct TTEntry
 {
     BestMove bestmove;
     int depth;
+    EntryFlag flag;
+    // is_valid???
 };
 
 static Board current_board = Board(STARTER_FEN);
@@ -65,141 +73,100 @@ int evaluate(const Board &board)
     return score * 100;
 }
 
-BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_player)
+BestMove negamax(Board &board, int depth, int alpha, int beta)
 {
-    Movelist moves;
-    movegen::legalmoves(moves, board);
+    const int alphaOrig = alpha;
 
-    std::shuffle(moves.begin(), moves.end(), rng);
-
-    auto side_to_move = board.sideToMove();
-
-    if (board.isHalfMoveDraw())
-    {
-        return {.move = Move::NO_MOVE,
-                .eval = board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE
-                            ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN)
-                            : DRAW_SCORE};
-    }
-
-    if (board.isRepetition())
-    {
-        return {.move = Move::NO_MOVE, .eval = DRAW_SCORE};
-    }
-
-    if (moves.empty())
-    {
-        return {.move = Move::NO_MOVE, .eval = board.inCheck() ? (side_to_move == Color::BLACK ? WHITE_WIN : BLACK_WIN) : DRAW_SCORE};
-    }
-
-    // Transposition table probe
+    // Transposition table lookup
     const auto hash = board.hash();
     auto tt_it = transposition_table.find(hash);
     if (tt_it != transposition_table.end() && tt_it->second.depth >= depth)
     {
-        return tt_it->second.bestmove;
+        const auto &entry = tt_it->second;
+        if (entry.flag == EntryFlag::EXACT)
+        {
+            return entry.bestmove;
+        }
+        else if (entry.flag == EntryFlag::LOWER_BOUND && entry.bestmove.eval >= beta)
+        {
+            return entry.bestmove;
+        }
+        else if (entry.flag == EntryFlag::UPPER_BOUND && entry.bestmove.eval <= alpha)
+        {
+            return entry.bestmove;
+        }
     }
 
-    // Base case
+    // Terminal conditions
+    if (board.isHalfMoveDraw() || board.isRepetition())
+    {
+        return {.move = Move::NO_MOVE, .eval = DRAW_SCORE};
+    }
+
+    Movelist moves;
+    movegen::legalmoves(moves, board);
+
+    if (moves.empty())
+    {
+        return {.move = Move::NO_MOVE, .eval = board.inCheck() ? -INF : DRAW_SCORE};
+    }
+
+    // Base case - return evaluation
     if (depth == 0)
     {
-        BestMove bestmove;
-        if (current_player == Color::WHITE)
-        {
-            bestmove = {.move = moves.front(), .eval = INT_MIN};
-            for (const auto &move : moves)
-            {
-                board.makeMove(move);
-                int eval = evaluate(board);
-                if (eval > bestmove.eval)
-                {
-                    bestmove.move = move;
-                    bestmove.eval = eval;
-                }
-                board.unmakeMove(move);
-            }
-        }
-        else
-        {
-            bestmove = {.move = moves.front(), .eval = INT_MAX};
-            for (const auto &move : moves)
-            {
-                board.makeMove(move);
-                int eval = evaluate(board);
-                if (eval < bestmove.eval)
-                {
-                    bestmove.move = move;
-                    bestmove.eval = eval;
-                }
-                board.unmakeMove(move);
-            }
-        }
-        // Store in TT
-        TTEntry entry = {bestmove, depth};
-        if (tt_it == transposition_table.end() || tt_it->second.depth <= depth)
-        {
-            transposition_table[hash] = entry;
-        }
-        return bestmove;
+        return {.move = Move::NO_MOVE, .eval = evaluate(board)};
     }
 
-    // Recursive case
-    BestMove bestmove;
-    if (current_player == Color::WHITE)
+    std::shuffle(moves.begin(), moves.end(), rng);
+
+    int value = INT_MIN;
+    Move bestMove = moves.front();
+
+    for (const auto &move : moves)
     {
-        bestmove = {.move = moves.front(), .eval = INT_MIN};
-        for (const auto &move : moves)
+        board.makeMove(move);
+        BestMove childResult = negamax(board, depth - 1, -beta, -alpha);
+        int childValue = -childResult.eval; // Negate the child's evaluation
+        board.unmakeMove(move);
+
+        if (childValue > value)
         {
-            board.makeMove(move);
-            BestMove candidatemove = alphabeta(board, depth - 1, alpha, beta, Color::BLACK);
-            if (candidatemove.eval > bestmove.eval)
-            {
-                bestmove.move = move;
-                bestmove.eval = candidatemove.eval;
-            }
-            board.unmakeMove(move);
-            if (candidatemove.eval >= beta)
-            {
-                break;
-            }
-            alpha = std::max(alpha, candidatemove.eval);
+            value = childValue;
+            bestMove = move;
         }
+
+        alpha = std::max(alpha, value);
+        if (alpha >= beta)
+        {
+            break; // Beta cutoff
+        }
+    }
+
+    // Store in transposition table
+    TTEntry entry;
+    entry.bestmove = {.move = bestMove, .eval = value};
+    entry.depth = depth;
+    if (value <= alphaOrig)
+    {
+        entry.flag = EntryFlag::UPPER_BOUND;
+    }
+    else if (value >= beta)
+    {
+        entry.flag = EntryFlag::LOWER_BOUND;
     }
     else
     {
-        bestmove = {.move = moves.front(), .eval = INT_MAX};
-        for (const auto &move : moves)
-        {
-            board.makeMove(move);
-            BestMove candidatemove = alphabeta(board, depth - 1, alpha, beta, Color::WHITE);
-            if (candidatemove.eval < bestmove.eval)
-            {
-                bestmove.move = move;
-                bestmove.eval = candidatemove.eval;
-            }
-            board.unmakeMove(move);
-            if (candidatemove.eval <= alpha)
-            {
-                break;
-            }
-            beta = std::min(beta, candidatemove.eval);
-        }
+        entry.flag = EntryFlag::EXACT;
     }
+    transposition_table[hash] = entry;
 
-    // Store in TT
-    TTEntry entry = {bestmove, depth};
-    if (tt_it == transposition_table.end() || tt_it->second.depth < depth)
-    {
-        transposition_table[hash] = entry;
-    }
-
-    return bestmove;
+    return {.move = bestMove, .eval = value};
 }
 
 void bestMove()
 {
     const auto starttime = std::chrono::high_resolution_clock::now();
-    const auto bestmove = alphabeta(current_board, DEPTH, INT_MIN, INT_MAX, current_board.sideToMove());
+    const auto bestmove = negamax(current_board, DEPTH, INT_MIN, INT_MAX);
     std::cout << "info score cp " << bestmove.eval << " time " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime).count() << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
