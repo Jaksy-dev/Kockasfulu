@@ -7,6 +7,7 @@
 #include <chrono>
 #include <unordered_map>
 #include <memory>
+#include <numeric>
 
 #include "chess.hpp"
 
@@ -43,6 +44,8 @@ static Board current_board = Board(STARTER_FEN);
 std::unique_ptr<std::unordered_map<uint64_t, TTEntry>> transposition_table;
 
 static std::mt19937 rng(std::random_device{}());
+
+static std::vector<int64_t> movetimes;
 
 std::vector<std::string> split_by_space(const std::string &input)
 {
@@ -170,13 +173,16 @@ int negamax(Board &board, int depth, int alpha, int beta)
 
     TTEntry tt_entry; // I should be overwriting the previous...maybe
     tt_entry.eval = max;
-    if (tt_entry.eval <= alphaOrig){
+    if (tt_entry.eval <= alphaOrig)
+    {
         tt_entry.flag = EntryFlag::UPPER_BOUND;
     }
-    else if (tt_entry.eval >= beta){
+    else if (tt_entry.eval >= beta)
+    {
         tt_entry.flag = EntryFlag::UPPER_BOUND;
     }
-    else{
+    else
+    {
         tt_entry.flag = EntryFlag::EXACT;
     }
     tt_entry.depth = depth;
@@ -221,8 +227,10 @@ void bestMove()
 {
     const auto starttime = std::chrono::high_resolution_clock::now();
     const auto bestmove = findBestMove(current_board, DEPTH);
-    std::cout << "info score cp " << bestmove.eval << " time " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime).count() << "\n";
+    const auto duration = (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime)).count();
+    std::cout << "info score cp " << bestmove.eval << " time " << duration << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
+    movetimes.push_back(duration);
 }
 
 void parseCommand(const std::string &input)
@@ -287,6 +295,7 @@ void parseCommand(const std::string &input)
     }
     if (main_command == "quit")
     {
+        std::cout << std::accumulate(movetimes.begin(), movetimes.end(), 0) / movetimes.size() << "ms\n";
         exit(0);
     }
 }
