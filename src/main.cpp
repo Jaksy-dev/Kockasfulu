@@ -59,7 +59,7 @@ std::vector<std::string> split_by_space(const std::string &input)
     return tokens;
 }
 
-int evaluate(const Board &board)
+int evaluate(Board &board, const Movelist& moves)
 {
     if (board.isHalfMoveDraw())
     {
@@ -70,9 +70,6 @@ int evaluate(const Board &board)
     {
         return DRAW_SCORE;
     }
-
-    Movelist moves;
-    movegen::legalmoves(moves, board);
 
     // no moves means game over
     if (moves.empty())
@@ -93,6 +90,31 @@ int evaluate(const Board &board)
     score -= board.pieces(PieceType::BISHOP, Color::BLACK).count() * 300;
     score -= board.pieces(PieceType::ROOK, Color::BLACK).count() * 500;
     score -= board.pieces(PieceType::QUEEN, Color::BLACK).count() * 900;
+
+    // doubled pawns (only immediately doubled)
+    auto w_pawns = board.pieces(PieceType::PAWN, Color::WHITE);
+    auto w_pawns_north = w_pawns << static_cast<uint8_t>(Direction::NORTH);
+    auto w_doubled = w_pawns & w_pawns_north;
+
+    auto b_pawns = board.pieces(PieceType::PAWN, Color::BLACK);
+    auto b_pawns_north = b_pawns << static_cast<uint8_t>(Direction::SOUTH);
+    auto b_doubled = b_pawns & b_pawns_north;
+
+    score -= w_doubled.count() * 50;
+    score += b_doubled.count() * 50;
+
+    // blocked pawns
+
+    // isolated pawns
+
+    // number of legal moves
+    board.makeNullMove(); // I guess this is flawed too...
+    Movelist their_moves;
+    movegen::legalmoves(their_moves, board);
+    board.unmakeNullMove();
+
+    auto moves_difference = moves.size() - their_moves.size();
+    board.sideToMove() == Color::WHITE ? score += moves_difference * 10 : score -= moves_difference * 10;
 
     return score;
 }
@@ -129,15 +151,16 @@ int negamax(Board &board, int depth, int alpha, int beta)
             return tt_entry.eval;
         }
     }
+    Movelist moves;
+    movegen::legalmoves(moves, board);
 
     if (depth == 0)
     {
-        return board.sideToMove() == Color::WHITE ? evaluate(board) : -evaluate(board);
+        return board.sideToMove() == Color::WHITE ? evaluate(board,moves) : -evaluate(board,moves);
     }
 
     int max = -INF;
-    Movelist moves;
-    movegen::legalmoves(moves, board);
+
 
     for (const auto &move : moves)
     {
@@ -295,7 +318,7 @@ void parseCommand(const std::string &input)
     }
     if (main_command == "quit")
     {
-        std::cout << std::accumulate(movetimes.begin(), movetimes.end(), 0) / movetimes.size() << "ms\n";
+        std::cout << std::accumulate(movetimes.begin(), movetimes.end(), 0) / movetimes.size() << "\n";
         exit(0);
     }
 }
