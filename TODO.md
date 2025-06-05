@@ -27,5 +27,9 @@
 [x] add compile options
 
 [ ] improvements to the search algorithm
-    [x] hash table / cache
+    
     [ ] iterative deepening
+    [ ] move ordering
+    [ ] quiesce
+    [ ] hash table / cache
+    

@@ -33,7 +33,7 @@ enum class EntryFlag
 
 struct TTEntry
 {
-    BestMove bestmove;
+    int eval;
     int depth;
     EntryFlag flag;
 };
@@ -58,11 +58,13 @@ std::vector<std::string> split_by_space(const std::string &input)
 
 int evaluate(const Board &board)
 {
-    if (board.isHalfMoveDraw()){
+    if (board.isHalfMoveDraw())
+    {
         return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? -INF : DRAW_SCORE;
     }
 
-    if (board.isRepetition()){
+    if (board.isRepetition())
+    {
         return DRAW_SCORE;
     }
 
@@ -70,7 +72,8 @@ int evaluate(const Board &board)
     movegen::legalmoves(moves, board);
 
     // no moves means game over
-    if (moves.empty()){
+    if (moves.empty())
+    {
         return board.inCheck() ? -INF : DRAW_SCORE;
     }
 
@@ -93,6 +96,37 @@ int evaluate(const Board &board)
 
 int negamax(Board &board, int depth, int alpha, int beta)
 {
+    int alphaOrig = alpha;
+
+    // (* Transposition Table Lookup; node is the lookup key for ttEntry *)
+    // ttEntry := transpositionTableLookup(node)
+    // if ttEntry.is_valid and ttEntry.depth ≥ depth then
+    //     if ttEntry.flag = EXACT then
+    //         return ttEntry.value
+    //     else if ttEntry.flag = LOWERBOUND and ttEntry.value ≥ beta then
+    //         return ttEntry.value
+    //     else if ttEntry.flag = UPPERBOUND and ttEntry.value ≤ alpha then
+    //         return ttEntry.value
+    const auto hash = board.hash();
+    const auto it = transposition_table->find(hash);
+    if (it != transposition_table->end() && it->second.depth >= depth)
+    {
+        auto &tt_entry = it->second;
+
+        if (tt_entry.flag == EntryFlag::EXACT)
+        {
+            return tt_entry.eval;
+        }
+        else if (tt_entry.flag == EntryFlag::LOWER_BOUND && tt_entry.eval >= beta)
+        {
+            return tt_entry.eval;
+        }
+        else if (tt_entry.flag == EntryFlag::LOWER_BOUND && tt_entry.eval <= alpha)
+        {
+            return tt_entry.eval;
+        }
+    }
+
     if (depth == 0)
     {
         return board.sideToMove() == Color::WHITE ? evaluate(board) : -evaluate(board);
@@ -121,6 +155,34 @@ int negamax(Board &board, int depth, int alpha, int beta)
             break; // Beta cutoff
         }
     }
+
+    // (* Transposition Table Store; node is the lookup key for ttEntry *)
+    // ttEntry.value := value
+    // if value ≤ alphaOrig then
+    //     ttEntry.flag := UPPERBOUND
+    // else if value ≥ β then
+    //     ttEntry.flag := LOWERBOUND
+    // else
+    //     ttEntry.flag := EXACT
+    // ttEntry.depth := depth
+    // ttEntry.is_valid := true
+    // transpositionTableStore(node, ttEntry)
+
+    TTEntry tt_entry; // I should be overwriting the previous...maybe
+    tt_entry.eval = max;
+    if (tt_entry.eval <= alphaOrig){
+        tt_entry.flag = EntryFlag::UPPER_BOUND;
+    }
+    else if (tt_entry.eval >= beta){
+        tt_entry.flag = EntryFlag::UPPER_BOUND;
+    }
+    else{
+        tt_entry.flag = EntryFlag::EXACT;
+    }
+    tt_entry.depth = depth;
+
+    (*transposition_table)[hash] = tt_entry;
+
     return max;
 }
 
@@ -133,7 +195,7 @@ BestMove findBestMove(Board &board, int depth)
     std::shuffle(moves.begin(), moves.end(), rng);
 
     int bestValue = -INF;
-    int alpha = -INF+1;
+    int alpha = -INF + 1;
     int beta = INF;
 
     for (const auto &move : moves)
