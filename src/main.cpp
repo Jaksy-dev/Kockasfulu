@@ -15,6 +15,7 @@ using namespace chess;
 constexpr auto DRAW_SCORE = 0;
 constexpr auto WHITE_WIN = INT_MAX;
 constexpr auto BLACK_WIN = INT_MIN;
+constexpr auto DEPTH = 8; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -33,6 +34,8 @@ struct TTEntry
 static Board current_board = Board(STARTER_FEN);
 
 static std::unordered_map<uint64_t, TTEntry> transposition_table;
+
+static std::mt19937 rng(std::random_device{}());
 
 std::vector<std::string> split_by_space(const std::string &input)
 {
@@ -67,7 +70,7 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
     Movelist moves;
     movegen::legalmoves(moves, board);
 
-    std::random_shuffle(moves.begin(), moves.end());
+    std::shuffle(moves.begin(), moves.end(), rng);
 
     auto side_to_move = board.sideToMove();
 
@@ -185,7 +188,7 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
 
     // Store in TT
     TTEntry entry = {bestmove, depth};
-    if (tt_it == transposition_table.end() || tt_it->second.depth <= depth)
+    if (tt_it == transposition_table.end() || tt_it->second.depth < depth)
     {
         transposition_table[hash] = entry;
     }
@@ -196,7 +199,7 @@ BestMove alphabeta(Board &board, int depth, int alpha, int beta, Color current_p
 void bestMove()
 {
     const auto starttime = std::chrono::high_resolution_clock::now();
-    const auto bestmove = alphabeta(current_board, 6, INT_MIN, INT_MAX, current_board.sideToMove());
+    const auto bestmove = alphabeta(current_board, DEPTH, INT_MIN, INT_MAX, current_board.sideToMove());
     std::cout << "info score cp " << bestmove.eval << " time " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime).count() << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
 }
