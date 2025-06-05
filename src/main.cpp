@@ -14,7 +14,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 8; // half-moves
+constexpr auto DEPTH = 7; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -41,7 +41,7 @@ struct TTEntry
 
 static Board current_board = Board(STARTER_FEN);
 
-static std::unordered_map<uint64_t, TTEntry> transposition_table;
+std::unique_ptr<std::unordered_map<uint64_t, TTEntry>> transposition_table;
 
 static std::mt19937 rng(std::random_device{}());
 
@@ -70,17 +70,18 @@ int evaluate(const Board &board)
     score -= 5 * board.pieces(PieceType::ROOK, Color::BLACK).count();
     score -= 9 * board.pieces(PieceType::QUEEN, Color::BLACK).count();
 
-    return score * 100;
+    return score * 100 ;
 }
 
 BestMove negamax(Board &board, int depth, int alpha, int beta)
 {
     const int alphaOrig = alpha;
+    //const int color = board.sideToMove() == Color::WHITE ? 1 : -1;
 
     // Transposition table lookup
     const auto hash = board.hash();
-    auto tt_it = transposition_table.find(hash);
-    if (tt_it != transposition_table.end() && tt_it->second.depth >= depth)
+    auto tt_it = transposition_table->find(hash);
+    if (tt_it != transposition_table->end() && tt_it->second.depth >= depth)
     {
         const auto &entry = tt_it->second;
         if (entry.flag == EntryFlag::EXACT)
@@ -158,7 +159,7 @@ BestMove negamax(Board &board, int depth, int alpha, int beta)
     {
         entry.flag = EntryFlag::EXACT;
     }
-    transposition_table[hash] = entry;
+    (*transposition_table)[hash] = entry;
 
     return {.move = bestMove, .eval = value};
 }
@@ -239,6 +240,7 @@ void parseCommand(const std::string &input)
 
 int main()
 {
+    transposition_table = std::make_unique<std::unordered_map<uint64_t, TTEntry>>();
     while (true)
     {
         std::string command;
