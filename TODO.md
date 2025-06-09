@@ -16,7 +16,9 @@
 
 [ ] nicer project structure
 
-[ ] heuristics for evaluation - pawns in centre, castling, knights in middle, rooks on open file, endgame king activation etc.
+[In progress] heuristics for evaluation - pawns in centre, castling, knights in middle, rooks on open file
+
+[ ] Opening/endgame/middlegame awareness
 
 [ ] opening book - might not be needed
 

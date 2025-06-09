@@ -59,7 +59,7 @@ std::vector<std::string> split_by_space(const std::string &input)
     return tokens;
 }
 
-int evaluate(Board &board, const Movelist& moves)
+int evaluate(Board &board, const Movelist &moves)
 {
     if (board.isHalfMoveDraw())
     {
@@ -156,11 +156,10 @@ int negamax(Board &board, int depth, int alpha, int beta)
 
     if (depth == 0)
     {
-        return board.sideToMove() == Color::WHITE ? evaluate(board,moves) : -evaluate(board,moves);
+        return board.sideToMove() == Color::WHITE ? evaluate(board, moves) : -evaluate(board, moves);
     }
 
     int max = -INF;
-
 
     for (const auto &move : moves)
     {
@@ -227,21 +226,30 @@ BestMove findBestMove(Board &board, int depth)
     int alpha = -INF + 1;
     int beta = INF;
 
-    for (const auto &move : moves)
-    {
-        board.makeMove(move);
-        int moveValue = -negamax(board, depth - 1, -beta, -alpha);
-        board.unmakeMove(move);
-        if (moveValue > bestValue)
+    // this should make it calculate for max 10s.
+    // using namespace std::literals;
+    // const auto time_limit = std::chrono::high_resolution_clock::now() + 10s;
+    // auto iter = 1;
+    // do
+    // {
+    //     std::cout << iter << "\t" << uci::moveToUci(bestMove) << "\n";
+        for (const auto &move : moves)
         {
-            bestValue = moveValue;
-            bestMove = move;
+            board.makeMove(move);
+            int moveValue = -negamax(board, /*iter*/depth - 1, -beta, -alpha);
+            board.unmakeMove(move);
+            if (moveValue > bestValue)
+            {
+                bestValue = moveValue;
+                bestMove = move;
+            }
+            if (moveValue > alpha)
+            {
+                alpha = moveValue;
+            }
         }
-        if (moveValue > alpha)
-        {
-            alpha = moveValue;
-        }
-    }
+    //     iter++;
+    // } while (time_limit < std::chrono::high_resolution_clock::now()  ||  iter <= depth);
 
     return {.move = bestMove, .eval = bestValue};
 }
