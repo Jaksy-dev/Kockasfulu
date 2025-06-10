@@ -61,6 +61,7 @@ std::vector<std::string> split_by_space(const std::string &input)
 
 int evaluate(Board &board, const Movelist &moves)
 {
+    //todo: make it evaluate from sidetomove perspective
     if (board.isHalfMoveDraw())
     {
         return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? -INF : DRAW_SCORE;
@@ -227,6 +228,7 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
 
     Movelist moves;
     movegen::legalmoves(moves, board);
+    
     Move bestMove = moves.front();
 
     // std::shuffle(moves.begin(), moves.end(), rng);
@@ -238,7 +240,7 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
     do
     {
 
-        int bestValue = -INF;
+        bestValue = -INF;
         int alpha = -INF + 1;
         int beta = INF;
 
