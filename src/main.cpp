@@ -152,10 +152,6 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
             return tt_entry.eval;
         }
     }
-    if (time_limit < std::chrono::high_resolution_clock::now())
-    {
-        return -INF;
-    }
 
     Movelist moves;
     movegen::legalmoves(moves, board);
@@ -164,6 +160,7 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
     {
         return board.sideToMove() == Color::WHITE ? evaluate(board, moves) : -evaluate(board, moves);
     }
+
 
     int max = -INF;
 
@@ -199,23 +196,25 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
     // ttEntry.is_valid := true
     // transpositionTableStore(node, ttEntry)
 
-    TTEntry tt_entry; // I should be overwriting the previous...maybe
-    tt_entry.eval = max;
-    if (tt_entry.eval <= alphaOrig)
-    {
-        tt_entry.flag = EntryFlag::UPPER_BOUND;
+    if ((it != transposition_table->end() && it->second.depth < depth) || it == transposition_table->end()){ //is this if needed? investigate
+        TTEntry tt_entry;
+        tt_entry.eval = max;
+        if (tt_entry.eval <= alphaOrig)
+        {
+            tt_entry.flag = EntryFlag::UPPER_BOUND;
+        }
+        else if (tt_entry.eval >= beta)
+        {
+            tt_entry.flag = EntryFlag::LOWER_BOUND;
+        }
+        else
+        {
+            tt_entry.flag = EntryFlag::EXACT;
+        }
+        tt_entry.depth = depth;
+    
+        (*transposition_table)[hash] = tt_entry;
     }
-    else if (tt_entry.eval >= beta)
-    {
-        tt_entry.flag = EntryFlag::LOWER_BOUND;
-    }
-    else
-    {
-        tt_entry.flag = EntryFlag::EXACT;
-    }
-    tt_entry.depth = depth;
-
-    (*transposition_table)[hash] = tt_entry;
 
     return max;
 }
