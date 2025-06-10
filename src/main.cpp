@@ -15,7 +15,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 10; // half-moves
+constexpr auto DEPTH = 20; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -261,7 +261,7 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
                 break;
             }
         }
-        iter++;
+        std::cout << "depth " << iter++ << " currmove " << uci::moveToUci(bestMove) <<"\n";
     } while (time_limit > std::chrono::high_resolution_clock::now() && iter <= depth);
 
     return {.move = bestMove, .eval = bestValue};
@@ -332,6 +332,9 @@ void parseCommand(const std::string &input)
 
     if (main_command == "go")
     {
+        if (commands[1] == "infinite"){
+            go(INF, INF, INF, INF);
+        }
 
         go(std::stoi(commands[2]) /*wtime*/, std::stoi(commands[4]) /*btime*/, std::stoi(commands[6]) /*winc*/, std::stoi(commands[8]) /*binc*/);
     }
