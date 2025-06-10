@@ -15,7 +15,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 6; // half-moves
+constexpr auto DEPTH = 10; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -119,7 +119,7 @@ int evaluate(Board &board, const Movelist &moves)
     return score;
 }
 
-int negamax(Board &board, int depth, int alpha, int beta)
+int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_point<std::chrono::high_resolution_clock> time_limit)
 {
     int alphaOrig = alpha;
 
@@ -146,11 +146,16 @@ int negamax(Board &board, int depth, int alpha, int beta)
         {
             return tt_entry.eval;
         }
-        else if (tt_entry.flag == EntryFlag::LOWER_BOUND && tt_entry.eval <= alpha)
+        else if (tt_entry.flag == EntryFlag::UPPER_BOUND && tt_entry.eval <= alpha)
         {
             return tt_entry.eval;
         }
     }
+    if (time_limit < std::chrono::high_resolution_clock::now())
+    {
+        return -INF;
+    }
+
     Movelist moves;
     movegen::legalmoves(moves, board);
 
@@ -164,7 +169,7 @@ int negamax(Board &board, int depth, int alpha, int beta)
     for (const auto &move : moves)
     {
         board.makeMove(move);
-        int score = -negamax(board, depth - 1, -beta, -alpha);
+        int score = -negamax(board, depth - 1, -beta, -alpha, time_limit);
         board.unmakeMove(move);
 
         if (score > max)
@@ -201,7 +206,7 @@ int negamax(Board &board, int depth, int alpha, int beta)
     }
     else if (tt_entry.eval >= beta)
     {
-        tt_entry.flag = EntryFlag::UPPER_BOUND;
+        tt_entry.flag = EntryFlag::LOWER_BOUND;
     }
     else
     {
@@ -214,29 +219,33 @@ int negamax(Board &board, int depth, int alpha, int beta)
     return max;
 }
 
-BestMove findBestMove(Board &board, int depth)
+BestMove findBestMove(Board &board, int depth, int time, int inc)
 {
+    using namespace std::literals;
+    auto get_time_limit = [](int time, int inc)
+    { return std::chrono::milliseconds{time / 20 + inc / 2}; };
+
     Movelist moves;
     movegen::legalmoves(moves, board);
     Move bestMove = moves.front();
 
-    std::shuffle(moves.begin(), moves.end(), rng);
+    // std::shuffle(moves.begin(), moves.end(), rng);
 
-    int bestValue = -INF;
-    int alpha = -INF + 1;
-    int beta = INF;
+    const auto time_limit = std::chrono::high_resolution_clock::now() + get_time_limit(time, inc);
+    auto iter = 1;
+    int bestValue;
 
-    // this should make it calculate for max 10s.
-    // using namespace std::literals;
-    // const auto time_limit = std::chrono::high_resolution_clock::now() + 10s;
-    // auto iter = 1;
-    // do
-    // {
-    //     std::cout << iter << "\t" << uci::moveToUci(bestMove) << "\n";
+    do
+    {
+
+        int bestValue = -INF;
+        int alpha = -INF + 1;
+        int beta = INF;
+
         for (const auto &move : moves)
         {
             board.makeMove(move);
-            int moveValue = -negamax(board, /*iter*/depth - 1, -beta, -alpha);
+            int moveValue = -negamax(board, iter - 1, -beta, -alpha, time_limit);
             board.unmakeMove(move);
             if (moveValue > bestValue)
             {
@@ -247,17 +256,22 @@ BestMove findBestMove(Board &board, int depth)
             {
                 alpha = moveValue;
             }
+            if (alpha >= beta)
+            {
+                break;
+            }
         }
-    //     iter++;
-    // } while (time_limit < std::chrono::high_resolution_clock::now()  ||  iter <= depth);
+        iter++;
+    } while (time_limit > std::chrono::high_resolution_clock::now() && iter <= depth);
 
     return {.move = bestMove, .eval = bestValue};
 }
 
-void bestMove()
+void go(int wtime, int btime, int winc, int binc)
 {
+    const auto side_to_move = current_board.sideToMove();
     const auto starttime = std::chrono::high_resolution_clock::now();
-    const auto bestmove = findBestMove(current_board, DEPTH);
+    const auto bestmove = findBestMove(current_board, DEPTH, side_to_move == Color::WHITE ? wtime : btime, side_to_move == Color::WHITE ? winc : binc);
     const auto duration = (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - starttime)).count();
     std::cout << "info score cp " << bestmove.eval << " time " << duration << "\n";
     std::cout << "bestmove " << uci::moveToUci(bestmove.move) << "\n";
@@ -318,11 +332,12 @@ void parseCommand(const std::string &input)
 
     if (main_command == "go")
     {
-        bestMove();
+
+        go(std::stoi(commands[2]) /*wtime*/, std::stoi(commands[4]) /*btime*/, std::stoi(commands[6]) /*winc*/, std::stoi(commands[8]) /*binc*/);
     }
     if (main_command == "stop")
     {
-        bestMove();
+        
     }
     if (main_command == "quit")
     {
