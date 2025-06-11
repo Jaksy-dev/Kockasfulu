@@ -258,7 +258,6 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
             }
             if (alpha >= beta)
             {
-                iter = DEPTH + 1;
                 break;
             }
 
