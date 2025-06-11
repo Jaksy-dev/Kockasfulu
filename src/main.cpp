@@ -238,7 +238,6 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
 
     do
     {
-
         bestValue = -INF;
         int alpha = -INF + 1;
         int beta = INF;
@@ -261,9 +260,14 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
             {
                 break;
             }
+            
+            if (time_limit > std::chrono::high_resolution_clock::now()){
+                break;
+            }
         }
+        
         std::cout << "depth " << iter++ << " currmove " << uci::moveToUci(bestMove) <<"\n";
-    } while (time_limit > std::chrono::high_resolution_clock::now() && iter <= depth);
+    } while (iter <= depth);
 
     return {.move = bestMove, .eval = bestValue};
 }
