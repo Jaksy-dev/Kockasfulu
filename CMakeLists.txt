@@ -26,6 +26,8 @@ target_include_directories(${PROJECT_NAME}
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(${PROJECT_NAME} PRIVATE
         -Wall -Wextra -Werror           # Warnings
-        -Ofast -march=native -flto -DNDEBUG           # Optimization
+        # -Ofast -march=native -flto 
+        #-DNDEBUG           # Optimization
+        -g
     )
 endif()

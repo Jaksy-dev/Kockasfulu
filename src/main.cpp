@@ -15,7 +15,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 10; // half-moves
+constexpr auto DEPTH = 6; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -227,7 +227,7 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
 
     Movelist moves;
     movegen::legalmoves(moves, board);
-    
+
     Move bestMove = moves.front();
 
     // std::shuffle(moves.begin(), moves.end(), rng);
@@ -258,11 +258,13 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
             }
             if (alpha >= beta)
             {
+                iter = DEPTH + 1;
                 break;
             }
 
-            if (time_limit > std::chrono::high_resolution_clock::now())
+            if (time_limit < std::chrono::high_resolution_clock::now())
             {
+                iter = DEPTH + 1;
                 break;
             }
         }
@@ -342,8 +344,11 @@ void parseCommand(const std::string &input)
         {
             go(INF, INF, INF, INF);
         }
+        else
+        {
 
-        go(std::stoi(commands[2]) /*wtime*/, std::stoi(commands[4]) /*btime*/, std::stoi(commands[6]) /*winc*/, std::stoi(commands[8]) /*binc*/);
+            go(std::stoi(commands[2]) /*wtime*/, std::stoi(commands[4]) /*btime*/, std::stoi(commands[6]) /*winc*/, std::stoi(commands[8]) /*binc*/);
+        }
     }
     if (main_command == "stop")
     {
