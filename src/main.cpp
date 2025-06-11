@@ -15,7 +15,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 8; // half-moves
+constexpr auto DEPTH = 32; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
