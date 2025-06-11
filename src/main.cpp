@@ -15,7 +15,7 @@ using namespace chess;
 
 constexpr auto DRAW_SCORE = 0;
 constexpr auto INF = INT_MAX;
-constexpr auto DEPTH = 6; // half-moves
+constexpr auto DEPTH = 8; // half-moves
 
 constexpr auto STARTER_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -228,29 +228,38 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
     Movelist moves;
     movegen::legalmoves(moves, board);
 
-    Move bestMove = moves.front();
+    Move bestMoveOverall;
 
     // std::shuffle(moves.begin(), moves.end(), rng);
 
     const auto time_limit = std::chrono::high_resolution_clock::now() + get_time_limit(time, inc);
     auto iter = 1;
-    int bestValue;
+    int bestValueOverall = -INF;
 
-    do
+    while (iter <= depth)
     {
-        bestValue = -INF;
+
+
+        int bestValueNew = -INF;
+        Move bestMoveNew;
         int alpha = -INF + 1;
         int beta = INF;
 
         for (const auto &move : moves)
         {
+            if (time_limit < std::chrono::high_resolution_clock::now())
+            {
+                break;
+            }
+
             board.makeMove(move);
             int moveValue = -negamax(board, iter - 1, -beta, -alpha, time_limit);
+            std::cout << moveValue <<  " " << uci::moveToUci(move) << "\n";
             board.unmakeMove(move);
-            if (moveValue > bestValue)
+            if (moveValue > bestValueNew)
             {
-                bestValue = moveValue;
-                bestMove = move;
+                bestValueNew = moveValue;
+                bestMoveNew = move;
             }
             if (moveValue > alpha)
             {
@@ -261,17 +270,19 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
                 break;
             }
 
-            if (time_limit < std::chrono::high_resolution_clock::now())
-            {
-                iter = DEPTH + 1;
-                break;
-            }
+
+        }
+        if (time_limit < std::chrono::high_resolution_clock::now())
+        {
+            break;
         }
 
-        std::cout << "depth " << iter++ << " currmove " << uci::moveToUci(bestMove) << "\n";
-    } while (iter <= depth);
+        std::cout << "depth " << iter++ << " currmove " << uci::moveToUci(bestMoveNew) << "\n";
+        bestMoveOverall = bestMoveNew;
+        bestValueOverall = bestValueNew;
+    };
 
-    return {.move = bestMove, .eval = bestValue};
+    return {.move = bestMoveOverall, .eval = bestValueOverall};
 }
 
 void go(int wtime, int btime, int winc, int binc)
