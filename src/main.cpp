@@ -61,7 +61,7 @@ std::vector<std::string> split_by_space(const std::string &input)
 
 int evaluate(Board &board, const Movelist &moves)
 {
-    //todo: make it evaluate from sidetomove perspective
+    // todo: make it evaluate from sidetomove perspective
     if (board.isHalfMoveDraw())
     {
         return board.getHalfMoveDrawType().first == GameResultReason::CHECKMATE ? -INF : DRAW_SCORE;
@@ -161,7 +161,6 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
         return board.sideToMove() == Color::WHITE ? evaluate(board, moves) : -evaluate(board, moves);
     }
 
-
     int max = -INF;
 
     for (const auto &move : moves)
@@ -196,7 +195,8 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
     // ttEntry.is_valid := true
     // transpositionTableStore(node, ttEntry)
 
-    if ((it != transposition_table->end() && it->second.depth < depth) || it == transposition_table->end()){ //is this if needed? investigate
+    if ((it != transposition_table->end() && it->second.depth < depth) || it == transposition_table->end())
+    { // is this if needed? investigate
         TTEntry tt_entry;
         tt_entry.eval = max;
         if (tt_entry.eval <= alphaOrig)
@@ -212,7 +212,7 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
             tt_entry.flag = EntryFlag::EXACT;
         }
         tt_entry.depth = depth;
-    
+
         (*transposition_table)[hash] = tt_entry;
     }
 
@@ -221,7 +221,7 @@ int negamax(Board &board, int depth, int alpha, int beta, std::chrono::time_poin
 
 BestMove findBestMove(Board &board, int depth, int time, int inc)
 {
-    using namespace std::literals;
+
     auto get_time_limit = [](int time, int inc)
     { return std::chrono::milliseconds{time / 20 + inc / 2}; };
 
@@ -260,13 +260,14 @@ BestMove findBestMove(Board &board, int depth, int time, int inc)
             {
                 break;
             }
-            
-            if (time_limit > std::chrono::high_resolution_clock::now()){
+
+            if (time_limit > std::chrono::high_resolution_clock::now())
+            {
                 break;
             }
         }
-        
-        std::cout << "depth " << iter++ << " currmove " << uci::moveToUci(bestMove) <<"\n";
+
+        std::cout << "depth " << iter++ << " currmove " << uci::moveToUci(bestMove) << "\n";
     } while (iter <= depth);
 
     return {.move = bestMove, .eval = bestValue};
@@ -337,7 +338,8 @@ void parseCommand(const std::string &input)
 
     if (main_command == "go")
     {
-        if (commands[1] == "infinite"){
+        if (commands[1] == "infinite")
+        {
             go(INF, INF, INF, INF);
         }
 
@@ -345,7 +347,6 @@ void parseCommand(const std::string &input)
     }
     if (main_command == "stop")
     {
-        
     }
     if (main_command == "quit")
     {
